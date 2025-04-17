@@ -291,8 +291,6 @@ The tests exercise:
 
 * [ ] Async I/O & streaming partial tokens
 * [ ] Built‑in Redis + SQLite memory backends
-* [ ] Plugin system for auth, rate limiting, analytics
-* [ ] Official Docker image & Helm chart
 
 ---
 

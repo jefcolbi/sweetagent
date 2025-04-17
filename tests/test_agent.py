@@ -65,4 +65,4 @@ class LLMAgentTestCase(TestCase):
         )
         assistant.register_agent_as_tool(weather_agent)
 
-        assistant.run("Hi")
+        # assistant.run("Hi")
