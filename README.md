@@ -49,11 +49,11 @@ Sweet Agent gives you those primitives—nothing more, nothing less—so you can
 ## Installation
 
 ```bash
-# From PyPI (soon)
+# From PyPI
 pip install sweetagent
 
 # Or from source
-pip install git+https://github.com/your‑org/sweetagent.git
+pip install git+https://github.com/jefcolbi/sweetagent.git
 ```
 
 Sweet Agent requires **Python ⩾ 3.8**.
