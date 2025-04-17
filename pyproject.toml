@@ -1,0 +1,35 @@
+[project]
+name = "sweetagent"
+version = "0.1.0"
+description = "Pluggable LLM/AI Agent library"
+readme = "README.md"
+authors = [
+    { name = "Matt Jeff", email = "jefcolbi@gmail.com" }
+]
+requires-python = ">=3.8"
+dependencies = [
+    "litellm>=1.65.7",
+    "python-decouple>=3.8",
+    "tokenizers<0.21",
+    "traceback-with-variables>=2.2.0",
+    "trender>=1.0.10",
+]
+
+[project.optional-dependencies]
+channels = [
+    "channels>=4.2.2",
+    "daphne>=4.1.2",
+]
+
+[dependency-groups]
+dev = [
+    "mypy",
+    "ruff",
+    "types-setuptools",
+    "pre-commit",
+    "tox",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
