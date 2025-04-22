@@ -15,3 +15,9 @@ class BaseShortTermMemory:
 
     def clear(self):
         self.messages.clear()
+
+    def inject_memories(self, memories: str):
+        raise NotImplementedError
+
+    def get_message(self, index: int) -> LLMChatMessage:
+        return self.messages[index]

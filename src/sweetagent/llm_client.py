@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union, List, Optional
 import json
 
 from litellm.types.utils import ModelResponse
@@ -18,6 +18,7 @@ class LLMClient:
         api_keys_rotator: Union[list, RotatingList],
         stdio: BaseStaIO,
         base_url: str = None,
+        litellm_complete_kwargs: Optional[dict] = None,
     ):
         self.provider = provider
         self.model = model
@@ -28,14 +29,18 @@ class LLMClient:
         )
         self.sta_stdio: BaseStaIO = stdio
         self.base_url: str = base_url
+        self.litellm_completion_kwargs = litellm_complete_kwargs or {}
 
     def complete(
         self,
         messages: List[dict],
         tools: List[dict],
         force_tool_call: Union[bool, str] = False,
+        temperature: int = 0,
     ) -> LLMChatMessage:
-        self.sta_stdio.log_debug(f"Sending {json.dumps(messages, indent=4)}")
+        self.sta_stdio.log_debug(
+            f"Using {self.base_url = } Sending {json.dumps(messages, indent=4)}"
+        )
 
         last_error = None
         try:
@@ -45,9 +50,10 @@ class LLMClient:
                         model=f"{self.provider}/{self.model}",
                         api_key=self.api_keys_rotator.current,
                         base_url=self.base_url,
-                        # temperature=0,
+                        temperature=temperature,
                         messages=messages,
                         tools=tools,
+                        **self.litellm_completion_kwargs,
                     )
                     break
                 except RateLimitError as e:

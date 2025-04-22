@@ -8,8 +8,10 @@ import re
 
 from sweetagent.short_term_memory.base import BaseShortTermMemory
 from sweetagent.short_term_memory.session import SessionMemory
+from sweetagent.long_term_memory.base import BaseLongTermMemory
+from sweetagent.long_term_memory.void import VoidLongTermMemory
 from sweetagent.utils import py_function_to_tool
-from sweetagent.prompt import PromptEngine
+from sweetagent.prompt import PromptEngine, BasePromptEngine
 from sweetagent.io import BaseStaIO
 
 
@@ -24,14 +26,16 @@ class LLMAgent:
         name: str,
         role: str,
         llm_client: LLMClient,
-        short_term_memory: Optional[SessionMemory],
+        short_term_memory: Optional[BaseShortTermMemory],
         stdio: BaseStaIO,
         steps: Optional[List[str]] = None,
-        prompt_engine: Optional[PromptEngine] = None,
+        prompt_engine: Optional[BasePromptEngine] = None,
         native_tool_call_support: bool = True,
         user_full_name: str = "Anonymous",
         user_extra_infos: Optional[dict] = None,
         work_mode: WorkMode = WorkMode.TASK,
+        long_term_memory: Optional[BaseLongTermMemory] = None,
+        auto_save_in_long_term_memory: bool = False,
         **kwargs,
     ):
         self.sta_stdio: BaseStaIO = stdio
@@ -42,6 +46,7 @@ class LLMAgent:
         self.user_full_name: str = user_full_name
         self.user_extra_infos: Optional[dict] = user_extra_infos
         self.work_mode: WorkMode = work_mode
+        self.auto_save_in_long_term_memory: bool = auto_save_in_long_term_memory
 
         self.prompt_engine: PromptEngine = (
             prompt_engine if prompt_engine else PromptEngine()
@@ -88,6 +93,12 @@ class LLMAgent:
                     ),
                 )
             )
+
+        self.long_term_memory: BaseLongTermMemory = (
+            long_term_memory or VoidLongTermMemory()
+        )
+        self.long_term_memory.set_agent_id(self.name)
+        self.long_term_memory.set_user_id(self.user_full_name)
 
     def configure_tools(self):
         pass
@@ -149,16 +160,26 @@ class LLMAgent:
             converted_tools.append(agent_as_tool)
         return converted_tools
 
-    def run(self, query_or_task: str = None):
+    def run(
+        self,
+        query_or_task: str = None,
+        use_memories: bool = False,
+        save_in_memories: bool = False,
+        **kwargs,
+    ):
         if query_or_task is None:
             raise ValueError("Pass a valid value for query_or_task argument")
 
-        self.short_term_memory.add_message(
-            LLMChatMessage(
-                role="user",
-                content=self.prompt_engine.modify_message_before_sending(query_or_task),
+        self._check_arguments(**kwargs)
+
+        if use_memories:
+            memories = self.long_term_memory.retrieve_messages(f"User: {query_or_task}")
+            self.sta_stdio.log_info(f"{memories = }")
+            self.short_term_memory.inject_memories(
+                self.prompt_engine.format_memories(memories)
             )
-        )
+
+        self._pre_run(query_or_task=query_or_task, **kwargs)
 
         while True:
             llm_message = self.llm_client.complete(
@@ -204,14 +225,11 @@ class LLMAgent:
                     tool_res = self.execute_tool(tool_call)
                     self.sta_stdio.log_info(f"tool ======> {tool_res}")
                     self.short_term_memory.add_message(tool_res)
-                    if self.work_mode == WorkMode.TASK:
-                        self.short_term_memory.add_message(
-                            LLMChatMessage(
-                                role="user",
-                                content="For kind == final_answer there must be a `message` "
-                                "section where you put the answer.",
-                            )
-                        )
+                    to_add = self.prompt_engine.get_message_to_add_to_tool_output(
+                        tool_res.content
+                    )
+                    if to_add:
+                        self.short_term_memory.add_message(to_add)
                 continue
             elif llm_message.content:
                 kind = cust_resp.kind.lower()
@@ -224,7 +242,12 @@ class LLMAgent:
 
                 if kind == "final_answer":
                     self.reset_short_term_memory()
-                    return real_content
+                    if save_in_memories or self.auto_save_in_long_term_memory:
+                        self.long_term_memory.add(
+                            query_or_task,
+                            real_content,
+                        )
+                    return self._post_run(real_content)
                 elif kind == "message":
                     user_input = self.sta_stdio.user_input_text(real_content)
                     self.short_term_memory.add_message(
@@ -244,3 +267,20 @@ class LLMAgent:
         parts = self.rgx_answer_format.split(content)
         if len(parts) > 1:
             return parts[1]
+
+    def _check_arguments(self, **kwargs):
+        pass
+
+    def _pre_run(self, query_or_task: str = None, **kwargs):
+        """Performs some actions before running the agent.
+        By default we put the query_or_task string in the short term memory (history)"""
+        self.short_term_memory.add_message(
+            LLMChatMessage(
+                role="user",
+                content=self.prompt_engine.modify_message_before_sending(query_or_task),
+            )
+        )
+
+    def _post_run(self, real_content: str) -> str:
+        """Process the answer of the agent before running."""
+        return real_content

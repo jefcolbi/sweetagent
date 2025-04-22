@@ -5,7 +5,7 @@ import re
 from _io import StringIO
 import yaml
 from trender import TRender
-from sweetagent.core import WorkMode, RetryToFix
+from sweetagent.core import WorkMode, RetryToFix, LLMChatMessage
 
 
 class FormatResponseModel(BaseModel):
@@ -16,7 +16,71 @@ class FormatResponseModel(BaseModel):
     tool_arguments: Optional[dict] = None
 
 
-class PromptEngine:
+class BasePromptEngine:
+    def __init__(self, **kwargs):
+        # These informations are set by the agent
+        self.agent_name: str = ""
+        self.agent_role: str = ""
+        self.native_tool_call_support: bool = True
+        self.native_thought = False
+        self.agent_steps: List[str] = []
+        self.user_full_name: str = ""
+        self.user_extra_infos: Optional[dict] = None
+        self.agent_work_mode: WorkMode = WorkMode.TASK
+
+    def get_system_message(self, with_tools: Optional[List[dict]] = None):
+        raise NotImplementedError
+
+    def modify_message_before_sending(self, message: str) -> str:
+        return message
+
+    def format_memories(self, memories: List[str]):
+        res = "\n".join([f"{i}. {entry}" for i, entry in enumerate(memories)])
+        return f"-------------------------\nYour memories\n\n{res}"
+
+    def extract_formatted_llm_response(self, text_response: str) -> FormatResponseModel:
+        raise NotImplementedError
+
+    def get_message_to_add_to_tool_output(
+        self, tool_output: str
+    ) -> Optional[LLMChatMessage]:
+        return None
+
+
+class SimplePromptEngine(BasePromptEngine):
+    def get_system_message(self, with_tools: Optional[List[dict]] = None):
+        res = f"""You are {self.agent_name}.
+
+You role is {self.agent_role}.
+
+-------------------------------
+
+The name of user you are interacting with is: {self.user_full_name}
+
+Here are extra informations about him/her:
+{json.dumps(self.user_extra_infos, indent=2) if self.user_extra_infos else ""}
+
+"""
+
+        if self.agent_steps:
+            res += "Here are the steps you must follow to perform your work.\n\n"
+            for i, step in enumerate(self.agent_steps, start=1):
+                res += f"{i}. {step}\n"
+
+        return res
+
+    def extract_formatted_llm_response(self, text_response: str) -> FormatResponseModel:
+        return FormatResponseModel(
+            kind="message" if self.agent_work_mode == WorkMode.CHAT else "final_answer",
+            message=text_response,
+        )
+
+
+class JsonPromptEngine(BasePromptEngine):
+    pass
+
+
+class PromptEngine(BasePromptEngine):
     rgx_section = re.compile(r"\++\s*(\w+)\s*\++")
     rgx_tool_arguments_field = re.compile(r"~+\s*(\w+)\s*~+")
 
@@ -108,17 +172,6 @@ john
 
 +++ end +++""")
 
-    def __init__(self, **kwargs):
-        # These informations are set by the agent
-        self.agent_name: str = ""
-        self.agent_role: str = ""
-        self.native_tool_call_support: bool = True
-        self.native_thought = False
-        self.agent_steps: List[str] = []
-        self.user_full_name: str = ""
-        self.user_extra_infos: Optional[dict] = None
-        self.agent_work_mode: WorkMode = WorkMode.TASK
-
     def get_system_message(self, with_tools: Optional[List[dict]] = None):
         res = f"""You are {self.agent_name}.
 
@@ -133,7 +186,7 @@ Here are extra informations about him/her:
 
 -------------------------------
 
-STRICTLY use this JSON format when returning your response to user.
+STRICTLY use this TEXT format when returning your response to user.
 {self.get_llm_response_format()}
 
 -------------------------------
@@ -300,3 +353,13 @@ Final answer after tools call
 
     def modify_message_before_sending(self, message: str) -> str:
         return f"{message}\n\n[[ respect the response format ]]"
+
+    def get_message_to_add_to_tool_output(
+        self, tool_output: str
+    ) -> Optional[LLMChatMessage]:
+        if self.agent_work_mode == WorkMode.TASK:
+            return LLMChatMessage(
+                role="user",
+                content="For kind == final_answer there must be a `message` "
+                "section where you put the answer.",
+            )

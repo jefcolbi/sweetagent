@@ -10,3 +10,6 @@ class SessionMemory(BaseShortTermMemory):
 
     def serialize_for_provider(self, provider: Optional[str] = None):
         return [message.to_dict(provider=provider) for message in self.messages]
+
+    def inject_memories(self, memories: str):
+        self.messages.append(LLMChatMessage(role="user", content=memories))

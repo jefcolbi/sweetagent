@@ -1,6 +1,6 @@
 [project]
 name = "sweetagent"
-version = "0.1.0"
+version = "0.1.1"
 description = "Pluggable LLM/AI Agent library"
 readme = "README.md"
 authors = [
@@ -19,6 +19,9 @@ dependencies = [
 channels = [
     "channels>=4.2.2",
     "daphne>=4.1.2",
+]
+mem0 = [
+    "mem0ai"
 ]
 
 [dependency-groups]

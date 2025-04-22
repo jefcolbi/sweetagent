@@ -18,7 +18,7 @@ URL = "https://github.com/jefcolbi/sweetagent.git"
 EMAIL = "jefcolbi@gmail.com"
 AUTHOR = "jefcolbi"
 REQUIRES_PYTHON = ">=3.8.0"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 # What packages are required for this module to be executed?
 REQUIRED = [
@@ -34,7 +34,8 @@ EXTRAS = {
     "channels": [
         "channels>=4.2.2",
         "daphne>=4.1.2",
-    ]
+    ],
+    "mem0": ["mem0ai"],
 }
 
 # The rest you shouldn't have to touch too much :)

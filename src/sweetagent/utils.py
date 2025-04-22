@@ -13,7 +13,8 @@ def py_function_to_tool(function: Callable) -> dict:
         fields[name] = (param.annotation, param.default)
 
     description = inspect.getdoc(function)
-
+    fields.pop("kwargs", None)
+    fields.pop("args", None)
     ArgTempModel = create_model("ArgTempModel", **fields)
     schema = ArgTempModel().schema()
     schema.pop("title", None)
