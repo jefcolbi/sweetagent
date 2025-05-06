@@ -12,7 +12,8 @@ from sweetagent.long_term_memory.base import BaseLongTermMemory
 from sweetagent.long_term_memory.void import VoidLongTermMemory
 from sweetagent.utils import py_function_to_tool
 from sweetagent.prompt import PromptEngine, BasePromptEngine
-from sweetagent.io import BaseStaIO
+from sweetagent.io.base import BaseStaIO
+from sweetagent.middlewares.base import BaseMiddleware
 
 
 class LLMAgent:
@@ -26,8 +27,8 @@ class LLMAgent:
         name: str,
         role: str,
         llm_client: LLMClient,
-        short_term_memory: Optional[BaseShortTermMemory],
         stdio: BaseStaIO,
+        short_term_memory: Optional[BaseShortTermMemory] = None,
         steps: Optional[List[str]] = None,
         prompt_engine: Optional[BasePromptEngine] = None,
         native_tool_call_support: bool = True,
@@ -36,6 +37,10 @@ class LLMAgent:
         work_mode: WorkMode = WorkMode.TASK,
         long_term_memory: Optional[BaseLongTermMemory] = None,
         auto_save_in_long_term_memory: bool = False,
+        auto_use_memories: bool = False,
+        after_tool_output_middlewares: Optional[List[BaseMiddleware]] = None,
+        after_user_message_middlewares: Optional[List[BaseMiddleware]] = None,
+        after_agent_message_middlewares: Optional[List[BaseMiddleware]] = None,
         **kwargs,
     ):
         self.sta_stdio: BaseStaIO = stdio
@@ -47,6 +52,7 @@ class LLMAgent:
         self.user_extra_infos: Optional[dict] = user_extra_infos
         self.work_mode: WorkMode = work_mode
         self.auto_save_in_long_term_memory: bool = auto_save_in_long_term_memory
+        self.auto_use_memories = auto_use_memories
 
         self.prompt_engine: PromptEngine = (
             prompt_engine if prompt_engine else PromptEngine()
@@ -63,6 +69,10 @@ class LLMAgent:
         self.tools: Dict[str, Callable] = {}
         self.agents: Dict[str, "LLMAgent"] = {}
         self.configure_tools()
+
+        self.after_user_message_middlewares = after_user_message_middlewares or []
+        self.after_agent_message_middlewares = after_agent_message_middlewares or []
+        self.after_tool_output_middlewares = after_tool_output_middlewares or []
 
         if short_term_memory:
             self.short_term_memory: BaseShortTermMemory = short_term_memory
@@ -172,7 +182,7 @@ class LLMAgent:
 
         self._check_arguments(**kwargs)
 
-        if use_memories:
+        if use_memories or self.auto_use_memories:
             memories = self.long_term_memory.retrieve_messages(f"User: {query_or_task}")
             self.sta_stdio.log_info(f"{memories = }")
             self.short_term_memory.inject_memories(
@@ -185,6 +195,7 @@ class LLMAgent:
             llm_message = self.llm_client.complete(
                 self.short_term_memory.serialize_for_provider(),
                 self.get_all_tools_for_llm(),
+                **self.get_client_completion_kwargs(),
             )
             self.sta_stdio.log_info(str(llm_message))
 
@@ -192,7 +203,7 @@ class LLMAgent:
                 pass
             elif llm_message.content:
                 try:
-                    cust_resp = self.prompt_engine.extract_formatted_llm_response(
+                    llm_message = self.prompt_engine.extract_formatted_llm_response(
                         llm_message.content
                     )
                 except RetryToFix as e:
@@ -208,23 +219,15 @@ class LLMAgent:
                     )
                     continue
 
-                self.sta_stdio.log_debug(str(cust_resp))
-                llm_message = LLMChatMessage(role="user", content=cust_resp.message)
-                self.sta_stdio.log_info(str(llm_message))
-
-                if cust_resp.tool_name:
-                    llm_message.name = cust_resp.tool_name
-                    llm_message.tool_calls = [
-                        ToolCall.from_formatted_response_model(cust_resp)
-                    ]
-
             self.short_term_memory.add_message(llm_message)
 
             if llm_message.tool_calls:
                 for tool_call in llm_message.tool_calls:
                     tool_res = self.execute_tool(tool_call)
                     self.sta_stdio.log_info(f"tool ======> {tool_res}")
-                    self.short_term_memory.add_message(tool_res)
+                    self.short_term_memory.add_message(
+                        self.apply_after_tool_output_middlewares(tool_call, tool_res)
+                    )
                     to_add = self.prompt_engine.get_message_to_add_to_tool_output(
                         tool_res.content
                     )
@@ -232,8 +235,8 @@ class LLMAgent:
                         self.short_term_memory.add_message(to_add)
                 continue
             elif llm_message.content:
-                kind = cust_resp.kind.lower()
-                real_content = cust_resp.message
+                kind = llm_message.kind.lower()
+                real_content = llm_message.content
 
                 if not real_content:
                     raise ValueError(
@@ -249,10 +252,13 @@ class LLMAgent:
                         )
                     return self._post_run(real_content)
                 elif kind == "message":
-                    user_input = self.sta_stdio.user_input_text(real_content)
-                    self.short_term_memory.add_message(
+                    user_input = self.sta_stdio.user_input_text(
+                        self.apply_after_agent_message_middlewares(llm_message).content
+                    )
+                    user_message = self.apply_after_user_message_middlewares(
                         LLMChatMessage(role="user", content=user_input)
                     )
+                    self.short_term_memory.add_message(user_message)
                     continue
                 elif kind == "tool_call":
                     pass
@@ -284,3 +290,33 @@ class LLMAgent:
     def _post_run(self, real_content: str) -> str:
         """Process the answer of the agent before running."""
         return real_content
+
+    def apply_after_user_message_middlewares(
+        self, to_send_chat_message: LLMChatMessage
+    ) -> LLMChatMessage:
+        for middleware in self.after_user_message_middlewares:
+            to_send_chat_message = middleware.after_user_message(
+                self, self.llm_client, to_send_chat_message
+            )
+        return to_send_chat_message
+
+    def apply_after_agent_message_middlewares(
+        self, to_send_chat_message: LLMChatMessage
+    ) -> LLMChatMessage:
+        for middleware in self.after_agent_message_middlewares:
+            to_send_chat_message = middleware.after_agent_message(
+                self, self.llm_client, to_send_chat_message
+            )
+        return to_send_chat_message
+
+    def apply_after_tool_output_middlewares(
+        self, tool_call: ToolCall, to_send_chat_message: LLMChatMessage
+    ) -> LLMChatMessage:
+        for middleware in self.after_tool_output_middlewares:
+            to_send_chat_message = middleware.after_tool_output(
+                self, self.llm_client, tool_call, to_send_chat_message
+            )
+        return to_send_chat_message
+
+    def get_client_completion_kwargs(self) -> dict:
+        return {}

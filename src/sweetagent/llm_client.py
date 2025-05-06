@@ -1,13 +1,14 @@
-from typing import Union, List, Optional
+from typing import Union, List
 import json
 
 from litellm.types.utils import ModelResponse
 
 from litellm import completion, RateLimitError
+from pydantic import BaseModel
 from traceback_with_variables import format_exc
 
 from sweetagent.core import RotatingList, LLMChatMessage
-from sweetagent.io import BaseStaIO
+from sweetagent.io.base import BaseStaIO
 
 
 class LLMClient:
@@ -18,7 +19,6 @@ class LLMClient:
         api_keys_rotator: Union[list, RotatingList],
         stdio: BaseStaIO,
         base_url: str = None,
-        litellm_complete_kwargs: Optional[dict] = None,
     ):
         self.provider = provider
         self.model = model
@@ -29,14 +29,9 @@ class LLMClient:
         )
         self.sta_stdio: BaseStaIO = stdio
         self.base_url: str = base_url
-        self.litellm_completion_kwargs = litellm_complete_kwargs or {}
 
     def complete(
-        self,
-        messages: List[dict],
-        tools: List[dict],
-        force_tool_call: Union[bool, str] = False,
-        temperature: int = 0,
+        self, messages: List[dict], tools: List[dict], **completion_kwargs
     ) -> LLMChatMessage:
         self.sta_stdio.log_debug(
             f"Using {self.base_url = } Sending {json.dumps(messages, indent=4)}"
@@ -50,10 +45,14 @@ class LLMClient:
                         model=f"{self.provider}/{self.model}",
                         api_key=self.api_keys_rotator.current,
                         base_url=self.base_url,
-                        temperature=temperature,
+                        temperature=completion_kwargs.pop("temperature", 0),
                         messages=messages,
                         tools=tools,
-                        **self.litellm_completion_kwargs,
+                        response_format=completion_kwargs.pop(
+                            "response_format",
+                            self.find_user_last_message_format(messages),
+                        ),
+                        **completion_kwargs,
                     )
                     break
                 except RateLimitError as e:
@@ -77,3 +76,10 @@ class LLMClient:
             return llm_message
         except Exception as e:
             self.sta_stdio.log_error(format_exc(e))
+
+    def find_user_last_message_format(
+        self, messages: List[dict]
+    ) -> Union[dict, BaseModel, None]:
+        for message in reversed(messages):
+            if message["role"] == "user":
+                return message.get("response_format")

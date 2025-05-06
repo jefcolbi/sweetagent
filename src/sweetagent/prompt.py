@@ -5,7 +5,7 @@ import re
 from _io import StringIO
 import yaml
 from trender import TRender
-from sweetagent.core import WorkMode, RetryToFix, LLMChatMessage
+from sweetagent.core import WorkMode, RetryToFix, LLMChatMessage, ToolCall
 
 
 class FormatResponseModel(BaseModel):
@@ -38,7 +38,7 @@ class BasePromptEngine:
         res = "\n".join([f"{i}. {entry}" for i, entry in enumerate(memories)])
         return f"-------------------------\nYour memories\n\n{res}"
 
-    def extract_formatted_llm_response(self, text_response: str) -> FormatResponseModel:
+    def extract_formatted_llm_response(self, text_response: str) -> LLMChatMessage:
         raise NotImplementedError
 
     def get_message_to_add_to_tool_output(
@@ -69,10 +69,11 @@ Here are extra informations about him/her:
 
         return res
 
-    def extract_formatted_llm_response(self, text_response: str) -> FormatResponseModel:
-        return FormatResponseModel(
+    def extract_formatted_llm_response(self, text_response: str) -> LLMChatMessage:
+        return LLMChatMessage(
+            role="assistant",
+            content=text_response,
             kind="message" if self.agent_work_mode == WorkMode.CHAT else "final_answer",
-            message=text_response,
         )
 
 
@@ -270,7 +271,7 @@ Final answer after tools call
             }
         )
 
-    def extract_formatted_llm_response(self, text_response: str) -> FormatResponseModel:
+    def extract_formatted_llm_response(self, text_response: str) -> LLMChatMessage:
         lines = text_response.splitlines(keepends=True)
         current_section: str = None
         string_builder: StringIO = None
@@ -313,9 +314,25 @@ Final answer after tools call
             sections["tool_arguments"] = None
 
         sections.pop("thought", None)
-        res = FormatResponseModel(**sections)
 
-        if res.kind == "final_answer" and not res.message:
+        if sections["tool_name"]:
+            tool_call = ToolCall(
+                name=sections["tool_name"],
+                type="function",
+                arguments=sections["tool_arguments"],
+            )
+        else:
+            tool_call = None
+
+        res = LLMChatMessage(
+            role="assistant",
+            content=sections["message"],
+            data=sections["data"],
+            tool_calls=[tool_call] if tool_call else None,
+            kind="message" if self.agent_work_mode == WorkMode.CHAT else "final_answer",
+        )
+
+        if res.kind == "final_answer" and not res.content:
             raise RetryToFix(
                 "For kind == final_answer there must be a `message` section where you put the answer."
             )

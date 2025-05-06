@@ -3788,6 +3788,19 @@ wheels = [
 ]
 
 [[package]]
+name = "redis"
+version = "5.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "async-timeout", version = "4.0.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.8.1' and python_full_version < '3.9'" },
+    { name = "async-timeout", version = "5.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.8.1' or (python_full_version >= '3.9' and python_full_version < '3.11.3')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/47/da/d283a37303a995cd36f8b92db85135153dc4f7a8e4441aa827721b442cfb/redis-5.2.1.tar.gz", hash = "sha256:16f2e22dff21d5125e8481515e386711a34cbec50f0e44413dd7d9c060a54e0f", size = 4608355 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3c/5f/fa26b9b2672cbe30e07d9a5bdf39cf16e3b80b42916757c5f92bca88e4ba/redis-5.2.1-py3-none-any.whl", hash = "sha256:ee7e1056b9aea0f04c6c2ed59452947f34c4940ee025f5dd83e6a6418b6989e4", size = 261502 },
+]
+
+[[package]]
 name = "referencing"
 version = "0.35.1"
 source = { registry = "https://pypi.org/simple" }
@@ -4353,7 +4366,7 @@ wheels = [
 
 [[package]]
 name = "sweetagent"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "litellm" },
@@ -4372,6 +4385,9 @@ mem0 = [
     { name = "mem0ai", version = "0.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.8.1'" },
     { name = "mem0ai", version = "0.1.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.8.1' and python_full_version < '3.9'" },
     { name = "mem0ai", version = "0.1.93", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+]
+redis = [
+    { name = "redis" },
 ]
 
 [package.dev-dependencies]
@@ -4393,11 +4409,12 @@ requires-dist = [
     { name = "litellm", specifier = ">=1.65.7" },
     { name = "mem0ai", marker = "extra == 'mem0'" },
     { name = "python-decouple", specifier = ">=3.8" },
+    { name = "redis", marker = "extra == 'redis'" },
     { name = "tokenizers", specifier = "<0.21" },
     { name = "traceback-with-variables", specifier = ">=2.2.0" },
     { name = "trender", specifier = ">=1.0.10" },
 ]
-provides-extras = ["channels", "mem0"]
+provides-extras = ["channels", "mem0", "redis"]
 
 [package.metadata.requires-dev]
 dev = [

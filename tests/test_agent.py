@@ -3,23 +3,22 @@ from unittest import TestCase
 from pathlib import Path
 import os
 
-from mem0.configs.base import MemoryConfig
-from mem0.embeddings.configs import EmbedderConfig
-from mem0.llms.configs import LlmConfig
+# from mem0.configs.base import MemoryConfig
+# from mem0.embeddings.configs import EmbedderConfig
+# from mem0.llms.configs import LlmConfig
 
 cur_dir = Path(os.path.abspath(__file__)).parent
 src_path = cur_dir.parent / "src"
 
 from sweetagent.llm_agent import LLMAgent
 from sweetagent.llm_client import LLMClient
-from sweetagent.io import ConsoleStaIO
+from sweetagent.io.base import ConsoleStaIO
 from sweetagent.short_term_memory.session import SessionMemory
 from sweetagent.core import WorkMode
 from sweetagent.prompt import SimplePromptEngine
-from sweetagent.long_term_memory.memzero import Mem0LongTermMemory
+
+# from sweetagent.long_term_memory.memzero import Mem0LongTermMemory
 from traceback_with_variables import (
-    activate_in_python_by_import,
-    activate_by_import,
     format_exc,
 )
 

@@ -65,10 +65,11 @@ Sweet Agent requires **Python ⩾ 3.8**.
 Below is the smallest useful agent: it exposes one tool (`get_weather`) and answers a user in the console.
 
 ```python
-from sweetagent.io import ConsoleStaIO
+from sweetagent.io.base import ConsoleStaIO
 from sweetagent.llm_client import LLMClient
 from sweetagent.short_term_memory.session import SessionMemory
 from sweetagent.llm_agent import LLMAgent
+
 
 class WeatherAgent(LLMAgent):
     """Return current weather for a city (demo)."""
@@ -80,6 +81,7 @@ class WeatherAgent(LLMAgent):
     def configure_tools(self):
         # Turn the method into an LLM‑callable tool
         self.register_function_as_tool(self.get_weather)
+
 
 if __name__ == "__main__":
     stdio = ConsoleStaIO("weather")

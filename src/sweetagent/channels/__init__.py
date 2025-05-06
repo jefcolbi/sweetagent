@@ -1,6 +1,6 @@
 from typing import Union
 
-from sweetagent.io import BaseStaIO
+from sweetagent.io.base import BaseStaIO
 from channels.generic.websocket import WebsocketConsumer
 import logging
 from traceback_with_variables import format_exc

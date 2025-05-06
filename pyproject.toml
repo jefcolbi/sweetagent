@@ -23,6 +23,9 @@ channels = [
 mem0 = [
     "mem0ai"
 ]
+redis = [
+    "redis"
+]
 
 [dependency-groups]
 dev = [
