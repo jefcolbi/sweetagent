@@ -300,3 +300,5 @@ The tests exercise:
 
 Sweet Agent is released under the MIT License. See [LICENSE](./LICENSE) for the full text.
 
+SweetAgent is developed under Connectivo AB.
+
