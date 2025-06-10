@@ -30,6 +30,7 @@ class LLMAgent:
         stdio: BaseStaIO,
         short_term_memory: Optional[BaseShortTermMemory] = None,
         steps: Optional[List[str]] = None,
+        instructions: Optional[str] = None,
         prompt_engine: Optional[BasePromptEngine] = None,
         native_tool_call_support: bool = True,
         user_full_name: str = "Anonymous",
@@ -47,6 +48,7 @@ class LLMAgent:
         self.name: str = name
         self.role: str = role
         self.steps: List[str] = steps if steps is not None else []
+        self.instructions: Optional[str] = instructions
         self.native_tool_call_support: bool = native_tool_call_support
         self.user_full_name: str = user_full_name
         self.user_extra_infos: Optional[dict] = user_extra_infos
