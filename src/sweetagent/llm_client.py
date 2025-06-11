@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union, List, Optional
 import json
 
 from litellm.types.utils import ModelResponse
@@ -19,6 +19,7 @@ class LLMClient:
         api_keys_rotator: Union[list, RotatingList],
         stdio: BaseStaIO,
         base_url: str = None,
+        completion_kwargs: Optional[dict] = None,
     ):
         self.provider = provider
         self.model = model
@@ -29,13 +30,24 @@ class LLMClient:
         )
         self.sta_stdio: BaseStaIO = stdio
         self.base_url: str = base_url
+        self.completion_kwargs = completion_kwargs
 
     def complete(
         self, messages: List[dict], tools: List[dict], **completion_kwargs
     ) -> LLMChatMessage:
+        if completion_kwargs:
+            completion_kwargs_to_use = completion_kwargs.copy()
+        elif self.completion_kwargs:
+            completion_kwargs_to_use = self.completion_kwargs.copy()
+        else:
+            completion_kwargs_to_use = {}
+
         self.sta_stdio.log_debug(
-            f"Using {self.base_url = } Sending {json.dumps(messages, indent=4)}"
+            f"Using {self.base_url = } and {completion_kwargs_to_use = } Sending {json.dumps(messages, indent=4)}"
         )
+        temperature = completion_kwargs_to_use.get("temperature")
+        if not temperature:
+            raise ValueError("...")
 
         last_error = None
         try:
@@ -45,14 +57,14 @@ class LLMClient:
                         model=f"{self.provider}/{self.model}",
                         api_key=self.api_keys_rotator.current,
                         base_url=self.base_url,
-                        temperature=completion_kwargs.pop("temperature", 0),
+                        temperature=completion_kwargs_to_use.pop("temperature", 0),
                         messages=messages,
                         tools=tools,
-                        response_format=completion_kwargs.pop(
+                        response_format=completion_kwargs_to_use.pop(
                             "response_format",
                             self.find_user_last_message_format(messages),
                         ),
-                        **completion_kwargs,
+                        **completion_kwargs_to_use,
                     )
                     break
                 except RateLimitError as e:

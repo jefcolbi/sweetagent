@@ -326,15 +326,15 @@ Final answer after tools call
 
         res = LLMChatMessage(
             role="assistant",
-            content=sections["message"],
+            content=sections.get("message"),
             data=sections["data"],
             tool_calls=[tool_call] if tool_call else None,
             kind="message" if self.agent_work_mode == WorkMode.CHAT else "final_answer",
         )
 
-        if res.kind == "final_answer" and not res.content:
+        if res.kind == "final_answer" and not (res.content or res.data):
             raise RetryToFix(
-                "For kind == final_answer there must be a `message` section where you put the answer."
+                "For kind == final_answer there must be a `message` or `data` section where you put the answer."
             )
 
         return res

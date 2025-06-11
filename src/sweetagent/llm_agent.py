@@ -236,13 +236,14 @@ class LLMAgent:
                     if to_add:
                         self.short_term_memory.add_message(to_add)
                 continue
-            elif llm_message.content:
+            elif llm_message.content or llm_message.data:
                 kind = llm_message.kind.lower()
                 real_content = llm_message.content
+                real_data = llm_message.data
 
-                if not real_content:
+                if not (real_content or real_data):
                     raise ValueError(
-                        f"Unable to get the real content ({real_content}) from {llm_message.content}"
+                        f"Unable to get the real content ({real_content}) or ({real_data}) from {llm_message}"
                     )
 
                 if kind == "final_answer":
@@ -252,7 +253,14 @@ class LLMAgent:
                             query_or_task,
                             real_content,
                         )
-                    return self._post_run(real_content)
+                    if real_content and real_data:
+                        return self._post_run(
+                            {"message": real_content, "data": real_data}
+                        )
+                    elif real_content:
+                        return self._post_run(real_content)
+                    else:
+                        return self._post_run(real_data)
                 elif kind == "message":
                     user_input = self.sta_stdio.user_input_text(
                         self.apply_after_agent_message_middlewares(llm_message).content
