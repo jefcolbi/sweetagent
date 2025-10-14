@@ -46,8 +46,8 @@ class LLMClient:
             f"Using {self.base_url = } and {completion_kwargs_to_use = } Sending {json.dumps(messages, indent=4)}"
         )
         temperature = completion_kwargs_to_use.get("temperature")
-        if not temperature:
-            raise ValueError("...")
+        if temperature is None:
+            raise ValueError("Temperature is None. Please provide a temperature.")
 
         last_error = None
         try:

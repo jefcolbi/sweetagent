@@ -139,14 +139,27 @@ class LLMAgent:
     def execute_tool(self, tool_call: ToolCall):
         if tool_call.name in self.tools:
             function = self.tools[tool_call.name]
-            res = function(**tool_call.arguments)
-            return LLMChatMessage(
-                role="tool",
-                content=res,
-                name=tool_call.name,
-                type="function_call_output",
-                tool_call_id=tool_call.tool_call_id,
-            )
+            try:
+                res = function(**tool_call.arguments)
+                return LLMChatMessage(
+                    role="tool",
+                    content=res,
+                    name=tool_call.name,
+                    type="function_call_output",
+                    tool_call_id=tool_call.tool_call_id,
+                )
+            except TypeError as e:
+                if "got an unexpected keyword argument" in str(e):
+                    return LLMChatMessage(
+                        role="tool",
+                        content=str(e),
+                        name=tool_call.name,
+                        type="function_call_output",
+                        tool_call_id=tool_call.tool_call_id,
+                    )
+
+                raise e
+
         elif tool_call.name in self.agents:
             agent = self.agents[tool_call.name]
             res = agent.run(**tool_call.arguments)

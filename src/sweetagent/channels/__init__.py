@@ -64,9 +64,7 @@ class ChannelWebsocketStaIO(BaseStaIO):
 
     def user_input_text(self, message: str, **kwargs):
         """Request an input from the user"""
-        self.consumer.send(
-            text_data=json.dumps({"type": "message", "message": message})
-        )
+        self.consumer.send(text_data=json.dumps({"type": "input", "message": message}))
         rcv_msg = self.queue.get(block=True)
         self.queue.task_done()
         return rcv_msg
@@ -75,7 +73,7 @@ class ChannelWebsocketStaIO(BaseStaIO):
         """Request an input user and attach some data in json format. Useful to show dropdown or buttons"""
         self.consumer.send(
             text_data=json.dumps(
-                {"type": "message_data", "message": message, "data": data}
+                {"type": "input_data", "message": message, "data": data}
             )
         )
         rcv_msg = self.queue.get(block=True)

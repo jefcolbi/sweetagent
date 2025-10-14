@@ -91,19 +91,19 @@ class ExistingLoggerMixinStaIO:
         self.logger = logger
 
     def log_info(self, message: str, **kwargs):
-        return self.logger.info(message, stacklevel=2, **kwargs)
+        return self.logger.info(message, stacklevel=3, **kwargs)
 
     def log_debug(self, message: str, **kwargs):
-        return self.logger.debug(message, stacklevel=2, **kwargs)
+        return self.logger.debug(message, stacklevel=3, **kwargs)
 
     def log_warning(self, message: str, **kwargs):
-        return self.logger.warning(message, stacklevel=2, **kwargs)
+        return self.logger.warning(message, stacklevel=3, **kwargs)
 
     def log_error(self, message: str, **kwargs):
-        return self.logger.error(message, stacklevel=2, **kwargs)
+        return self.logger.error(message, stacklevel=3, **kwargs)
 
     def log_traceback(self, exception: Exception, **kwargs):
-        return self.logger.error(format_exc(exception), stacklevel=2, **kwargs)
+        return self.logger.error(format_exc(exception), stacklevel=3, **kwargs)
 
 
 class PredefinedLoggerMixinStaIO(ExistingLoggerMixinStaIO):
@@ -126,15 +126,20 @@ class ConsoleLoggerMixinStaIO(ExistingLoggerMixinStaIO):
     ):
         self.console = logging.getLogger(name)
         self.console.setLevel(level)
-        self.hdlr = logging.StreamHandler()
-        self.hdlr.setFormatter(
-            logging.Formatter(
-                fmt=log_format,
-                datefmt=log_date_format,
+        for handler in self.console.handlers:
+            if isinstance(handler, logging.StreamHandler):
+                self.hdlr = handler
+                break
+        else:
+            self.hdlr = logging.StreamHandler()
+            self.hdlr.setFormatter(
+                logging.Formatter(
+                    fmt=log_format,
+                    datefmt=log_date_format,
+                )
             )
-        )
-        self.hdlr.setLevel(level)
-        self.console.addHandler(self.hdlr)
+            self.hdlr.setLevel(level)
+            self.console.addHandler(self.hdlr)
         ExistingLoggerMixinStaIO.__init__(self, self.console)
 
 
@@ -152,15 +157,20 @@ class RotatingFileLoggerMixinStaIO(ExistingLoggerMixinStaIO):
     ):
         logger = logging.getLogger(name)
         logger.setLevel(level)
-        hdlr = RotatingFileHandler(filename=filename, backupCount=backup_count)
-        hdlr.setFormatter(
-            logging.Formatter(
-                fmt=log_format,
-                datefmt=log_date_format,
+        for handler in logger.handlers:
+            if isinstance(handler, RotatingFileHandler):
+                hdlr = handler
+                break
+        else:
+            hdlr = RotatingFileHandler(filename=filename, backupCount=backup_count)
+            hdlr.setFormatter(
+                logging.Formatter(
+                    fmt=log_format,
+                    datefmt=log_date_format,
+                )
             )
-        )
-        hdlr.setLevel(level)
-        logger.addHandler(hdlr)
+            hdlr.setLevel(level)
+            logger.addHandler(hdlr)
         ExistingLoggerMixinStaIO.__init__(self, logger)
 
 
