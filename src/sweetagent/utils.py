@@ -16,7 +16,10 @@ def py_function_to_tool(function: Callable) -> dict:
     fields.pop("kwargs", None)
     fields.pop("args", None)
     ArgTempModel = create_model("ArgTempModel", **fields)
-    schema = ArgTempModel().schema()
+    if hasattr(ArgTempModel, "model_json_schema"):
+        schema = ArgTempModel.model_json_schema()
+    else:
+        schema = ArgTempModel.schema()
     schema.pop("title", None)
 
     res = {

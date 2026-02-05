@@ -19,7 +19,11 @@ except Exception:
 
 class RedisInputMixinStaIO:
     def __init__(self, run_id: str, config_url: str, **kwargs):
-        self.redis_cli = redis.from_url(config_url)
+        if not config_url:
+            # Fallback for tests or local runs without Redis configured.
+            self.redis_cli = _InMemoryRedis()
+        else:
+            self.redis_cli = redis.from_url(config_url)
         self.to_user_key = f"{run_id}-user"
         self.to_agent_key = f"{run_id}-agent"
 
@@ -90,3 +94,15 @@ class RedisWithConsoleStaIO(ConsoleLoggerMixinStaIO, RedisInputMixinStaIO, BaseS
     ):
         ConsoleLoggerMixinStaIO.__init__(self, logger_name, **kwargs)
         RedisInputMixinStaIO.__init__(self, run_id, config_url)
+
+
+class _InMemoryRedis:
+    def __init__(self):
+        self._store = {}
+
+    def set(self, key, value):
+        self._store[key] = value
+        return True
+
+    def getdel(self, key):
+        return self._store.pop(key, None)

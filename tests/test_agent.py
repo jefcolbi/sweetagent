@@ -84,7 +84,11 @@ class LLMAgentTestCase(TestCase):
     def test_03_weather_agent(self):
         stdio = ConsoleStaIO("default")
         client = LLMClient(
-            LLM_PROVIDER, LLM_MODEL, config("OPENAI_API_KEYS").split(","), stdio=stdio
+            LLM_PROVIDER,
+            LLM_MODEL,
+            config("OPENAI_API_KEYS").split(","),
+            stdio=stdio,
+            completion_kwargs={"temperature": 1},
         )
         agent = WeatherAgent(
             "Weather Agent",

@@ -75,13 +75,21 @@ class ConsoleInputMixinStaIO:
         """Request an input from the user"""
         self.log_info(f"User Input: {message}")
         print(message)
-        return input(">> ")
+        try:
+            return input(">> ")
+        except EOFError:
+            self.log_warning("No stdin available; returning empty input.")
+            return ""
 
     def user_input_text_with_data(self, message: str, data: Union[dict, list]):
         """Request an input user and attach some data in json format. Useful to show dropdown or buttons"""
         self.log_info(f"User Input: {message}\n{json.dumps(data)}")
         print(f"{message}\n{json.dumps(data)}")
-        return input(">> ")
+        try:
+            return input(">> ")
+        except EOFError:
+            self.log_warning("No stdin available; returning empty input.")
+            return ""
 
 
 class ExistingLoggerMixinStaIO:

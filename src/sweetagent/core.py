@@ -63,7 +63,7 @@ class LLMChatMessage:
         res = {}
         if self.role:
             res["role"] = self.role
-        if self.content:
+        if self.content is not None:
             res["content"] = self.content
         if self.name:
             res["name"] = self.name

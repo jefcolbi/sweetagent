@@ -42,21 +42,28 @@ class LLMClient:
         else:
             completion_kwargs_to_use = {}
 
+        provider_to_use = self.provider
+        base_url_to_use = self.base_url
+        if provider_to_use == "azure" and not base_url_to_use:
+            self.sta_stdio.log_warning(
+                "Azure provider selected without a base_url; falling back to openai."
+            )
+            provider_to_use = "openai"
+
         self.sta_stdio.log_debug(
-            f"Using {self.base_url = } and {completion_kwargs_to_use = } Sending {json.dumps(messages, indent=4)}"
+            f"Using {base_url_to_use = } and {completion_kwargs_to_use = } Sending {json.dumps(messages, indent=4)}"
         )
-        temperature = completion_kwargs_to_use.get("temperature")
-        if temperature is None:
-            raise ValueError("Temperature is None. Please provide a temperature.")
+        if completion_kwargs_to_use.get("temperature") is None:
+            completion_kwargs_to_use["temperature"] = 0
 
         last_error = None
         try:
             for i in range(self.api_keys_rotator.max_iter):
                 try:
                     resp: ModelResponse = completion(
-                        model=f"{self.provider}/{self.model}",
+                        model=f"{provider_to_use}/{self.model}",
                         api_key=self.api_keys_rotator.current,
-                        base_url=self.base_url,
+                        base_url=base_url_to_use,
                         temperature=completion_kwargs_to_use.pop("temperature", 0),
                         messages=messages,
                         tools=tools,
@@ -88,6 +95,7 @@ class LLMClient:
             return llm_message
         except Exception as e:
             self.sta_stdio.log_error(format_exc(e))
+            raise
 
     def find_user_last_message_format(
         self, messages: List[dict]

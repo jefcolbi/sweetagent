@@ -324,12 +324,17 @@ Final answer after tools call
         else:
             tool_call = None
 
+        kind = (
+            sections.get("kind")
+            or ("message" if self.agent_work_mode == WorkMode.CHAT else "final_answer")
+        ).lower()
+
         res = LLMChatMessage(
             role="assistant",
             content=sections.get("message"),
             data=sections["data"],
             tool_calls=[tool_call] if tool_call else None,
-            kind="message" if self.agent_work_mode == WorkMode.CHAT else "final_answer",
+            kind=kind,
         )
 
         if res.kind == "final_answer" and not (res.content or res.data):

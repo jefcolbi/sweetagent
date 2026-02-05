@@ -278,6 +278,11 @@ class LLMAgent:
                     user_input = self.sta_stdio.user_input_text(
                         self.apply_after_agent_message_middlewares(llm_message).content
                     )
+                    if not user_input or not str(user_input).strip():
+                        self.sta_stdio.log_warning(
+                            "Empty user input; ending chat loop."
+                        )
+                        return self._post_run("")
                     user_message = self.apply_after_user_message_middlewares(
                         LLMChatMessage(role="user", content=user_input)
                     )
