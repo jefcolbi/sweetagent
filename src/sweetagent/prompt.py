@@ -1,5 +1,5 @@
 import json
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict
 from pydantic import BaseModel
 import re
 from _io import StringIO
@@ -385,3 +385,164 @@ Final answer after tools call
                 content="For kind == final_answer there must be a `message` "
                 "section where you put the answer.",
             )
+
+
+class BaseState:
+    name: str
+
+    def __init__(
+        self,
+        entry: Optional[str] = None,
+        do: Optional[str] = None,
+        _exit: Optional[str] = None,
+    ):
+        self.entry = entry
+        self.do = do
+        self._exit = _exit
+
+        self.transitions: List[Dict] = []
+
+    def add_transition(
+        self,
+        event: Optional[str] = None,
+        condition: Optional[str] = None,
+        action: Optional[str] = None,
+        next_state: Optional[str] = None,
+    ):
+        trans = {}
+        if event:
+            trans["event"] = event
+        if condition:
+            trans["condition"] = condition
+        if action:
+            trans["action"] = action
+        if next_state:
+            trans["next_state"] = next_state
+        self.transitions.append(trans)
+
+    def to_string(self):
+        res = self.build_decl()
+        transs = self.build_multiple_transitions()
+        if transs:
+            res += f"\n\n{transs}"
+        return res
+
+    def build_decl(self):
+        res = f"state {self.name}"
+
+        if self.do or self.entry or self._exit:
+            res += " {"
+            if self.entry:
+                res += f"\n  entry / {self.entry}()"
+            if self.do:
+                res += f"\n  do / {self.do}()"
+            if self._exit:
+                res += f"\n  exit / {self._exit}"
+            res += "\n}"
+
+        return res
+
+    def build_single_transition(self, transition: Dict):
+        event: str = transition.get("event")
+        condition: str = transition.get("condition")
+        action: str = transition.get("action")
+        next_state: str = transition.get("next_state")
+
+        res = f"{self.name} "
+        if next_state:
+            res += f"--> {next_state} "
+        if event:
+            res += f": {event} "
+        if condition:
+            res += f"[{condition}] "
+        if action:
+            res += f"/ {action}"
+        return res
+
+    def build_multiple_transitions(self):
+        res = ""
+        for trans in self.transitions:
+            res += f"{self.build_single_transition(trans)}\n"
+        return res
+
+    def __str__(self):
+        res = f"{self.name}("
+        parts = []
+        if self.entry:
+            parts.append(f"entry={self.entry}")
+        if self.do:
+            parts.append(f"do={self.do}")
+        if self._exit:
+            parts.append(f"exit={self._exit}")
+        if self.transitions:
+            parts.append(f"transitions={self.transitions}")
+        res += ", ".join(parts)
+        res += ")"
+        return res
+
+
+class FSM:
+    def __init__(
+        self, initial_state: BaseState, end_state: BaseState, states: List[BaseState]
+    ):
+        pass
+
+
+class FSMPromptEngine(BasePromptEngine):
+    rgx_plus = re.compile(r"\++")
+
+    def __init__(self, **kwargs):
+        self.initial_state: BaseState = kwargs.pop("initial_state")
+        self.end_state: BaseState = kwargs.pop("end_state")
+        self.states: List[BaseState] = kwargs.pop("states")
+        super().__init__(**kwargs)
+
+    def get_system_message(self, with_tools: Optional[List[dict]] = None):
+        states_as_str = ""
+        for state in self.states:
+            states_as_str += f"{state.to_string()}\n\n"
+
+        return f"""You are a conversational agent named {self.agent_name} driven STRICTLY by a state machine.
+
+ABSOLUTE RULES:
+
+1. You permanently maintain an internal variable `current_state`.
+2. You may produce ONLY responses authorized by the current state.
+3. You may change state ONLY through an explicitly valid transition.
+4. If the user's response is invalid for the current state, you MUST remain in the same state and repeat the question.
+5. You NEVER anticipate future information.
+6. You NEVER ask for multiple pieces of information at once.
+7. You NEVER explain the internal logic or the states.
+
+ROLE:
+
+{self.agent_role}
+
+FINITE STATE MACHINE (UNIQUE AUTHORITY):
+
+```pl
+@startuml
+[*] --> {self.initial_state.name}
+
+{states_as_str}
+{self.end_state.name} --> [*]
+@enduml
+```
+
+FORMAT TO REPLY TO USER:
+
+```
+[Your message...]
++++++++
+[current_state]
+```
+"""
+
+    def extract_formatted_llm_response(self, text_response: str) -> LLMChatMessage:
+        parts = self.rgx_plus.split(text_response)
+        current_state = parts[-1].strip()
+        return LLMChatMessage(
+            role="assistant",
+            content=parts[0].strip(),
+            kind="message" if self.end_state.name != current_state else "final_answer",
+        )
