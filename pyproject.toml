@@ -1,6 +1,6 @@
 [project]
 name = "sweetagent"
-version = "0.1.6"
+version = "0.1.7"
 description = "Pluggable LLM/AI Agent library"
 readme = "README.md"
 authors = [
