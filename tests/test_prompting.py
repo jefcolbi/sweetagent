@@ -15,7 +15,7 @@ cur_dir = Path(os.path.abspath(__file__)).parent
 src_path = cur_dir.parent / "src"
 print(f"{src_path = }")
 
-from sweetagent.prompt import PromptEngine, BaseState, FSMPromptEngine
+from sweetagent.prompt import PromptEngine, BaseState, FSMPromptEngine, Transition
 
 LLM_PROVIDER = config("LLM_PROVIDER", default="azure")
 LLM_MODEL = config("LLM_MODEL", default="gpt-4o")
@@ -85,6 +85,9 @@ class _IdleState(BaseState):
 
 class _WorkingState(BaseState):
     name = "Working"
+    default_entry = "on_enter"
+    default_do = "run"
+    default_exit = "cleanup"
 
 
 class BaseStateTestCase(TestCase):
@@ -93,7 +96,7 @@ class BaseStateTestCase(TestCase):
         self.assertEqual(state.to_string(), "state Idle")
 
     def test_02_state_declaration_with_actions(self):
-        state = _WorkingState(entry="on_enter", do="run", _exit="cleanup")
+        state = _WorkingState()
         expected = (
             "state Working {\n  entry / on_enter()\n  do / run()\n  exit / cleanup\n}"
         )
@@ -144,14 +147,26 @@ Douala
 
 class _AskNameState(BaseState):
     name = "AskName"
+    event_name_provided = "name_provided"
+    default_transitions = [
+        Transition(event=event_name_provided, next_state="AskAge"),
+    ]
 
 
 class _AskAgeState(BaseState):
     name = "AskAge"
+    event_age_provided = "age_provided"
+    default_transitions = [
+        Transition(event=event_age_provided, next_state="ShowSummary"),
+    ]
 
 
 class _ShowSummaryState(BaseState):
     name = "ShowSummary"
+    event_done = "done"
+    default_transitions = [
+        Transition(event=event_done, next_state="End"),
+    ]
 
 
 class _EndState(BaseState):
@@ -160,42 +175,107 @@ class _EndState(BaseState):
 
 class _AccueilState(BaseState):
     name = "Accueil"
+    default_entry = "saluer_en_se_presentant_poliment_et_professionellement_et_ensuite_demander_prenom"
+    event_message_utilisateur = "message_utilisateur"
+    default_transitions = [
+        Transition(event=event_message_utilisateur, next_state="DemandePrenom"),
+    ]
 
 
 class _DemandePrenomState(BaseState):
     name = "DemandePrenom"
+    default_entry = "demander_prenom"
+    event_reponse_invalide = "reponse_invalide"
+    event_prenom_valide = "prenom_valide"
+    default_transitions = [
+        Transition(event=event_reponse_invalide, next_state="DemandePrenom"),
+        Transition(event=event_prenom_valide, next_state="DemandeService"),
+    ]
 
 
 class _DemandeServiceState(BaseState):
     name = "DemandeService"
+    default_entry = "demander_service_avec_options:  Réparations rapides :: Rénovation énergétique :: Travaux électriques :: Salle de bain :: Cuisine"
+    event_service_invalide = "service_invalide"
+    event_service_valide = "service_valide"
+    default_transitions = [
+        Transition(event=event_service_invalide, next_state="DemandeService"),
+        Transition(event=event_service_valide, next_state="DemandeDelai"),
+    ]
 
 
 class _DemandeDelaiState(BaseState):
     name = "DemandeDelai"
+    default_entry = "demander_delai_execution"
+    event_delai_invalide = "delai_invalide"
+    event_delai_valide = "delai_valide"
+    default_transitions = [
+        Transition(event=event_delai_invalide, next_state="DemandeDelai"),
+        Transition(event=event_delai_valide, next_state="CalculDate"),
+    ]
 
 
 class _CalculDateState(BaseState):
     name = "CalculDate"
+    default_entry = "appeler_outil_getCurrentDay_et_calculer_date"
+    default_transitions = [
+        Transition(next_state="DemandeBudget"),
+    ]
 
 
 class _DemandeBudgetState(BaseState):
     name = "DemandeBudget"
+    default_entry = "demander_budget_en_euros"
+    event_budget_invalide = "budget_invalide"
+    event_budget_valide = "budget_valide"
+    default_transitions = [
+        Transition(event=event_budget_invalide, next_state="DemandeBudget"),
+        Transition(event=event_budget_valide, next_state="DemandeAdresse"),
+    ]
 
 
 class _DemandeAdresseState(BaseState):
     name = "DemandeAdresse"
+    default_entry = "demander_adresse_charleroi"
+    event_adresse_invalide = "adresse_invalide"
+    event_adresse_valide = "adresse_valide"
+    default_transitions = [
+        Transition(event=event_adresse_invalide, next_state="DemandeAdresse"),
+        Transition(event=event_adresse_valide, next_state="Recapitulatif"),
+    ]
 
 
 class _RecapitulatifState(BaseState):
     name = "Recapitulatif"
+    default_entry = "afficher_resume_et_demander_confirmation"
+    event_confirmation_oui = "confirmation_oui"
+    event_confirmation_non = "confirmation_non"
+    default_transitions = [
+        Transition(event=event_confirmation_oui, next_state="Sauvegarde"),
+        Transition(event=event_confirmation_non, next_state="Correction"),
+    ]
 
 
 class _CorrectionState(BaseState):
     name = "Correction"
+    default_entry = "demander_information_erronee"
+    event_correction_prenom = "correction_prenom"
+    event_correction_service = "correction_service"
+    event_correction_delai = "correction_delai"
+    event_correction_budget = "correction_budget"
+    event_correction_adresse = "correction_adresse"
+    default_transitions = [
+        Transition(event=event_correction_prenom, next_state="DemandePrenom"),
+        Transition(event=event_correction_service, next_state="DemandeService"),
+        Transition(event=event_correction_delai, next_state="DemandeDelai"),
+        Transition(event=event_correction_budget, next_state="DemandeBudget"),
+        Transition(event=event_correction_adresse, next_state="DemandeAdresse"),
+    ]
 
 
 class _SauvegardeState(BaseState):
     name = "Sauvegarde"
+    default_entry = "sauvegarder_donnees_avec_outil_sauvegarder_et_feliciter"
 
 
 class SupportAgent(LLMAgent):
@@ -220,10 +300,6 @@ class FSMPromptEngineTestCase(TestCase):
         ask_age = _AskAgeState()
         show_summary = _ShowSummaryState()
         end = _EndState()
-
-        ask_name.add_transition(event="name_provided", next_state="AskAge")
-        ask_age.add_transition(event="age_provided", next_state="ShowSummary")
-        show_summary.add_transition(event="done", next_state="End")
 
         engine = FSMPromptEngine(
             initial_state=ask_name,
@@ -260,74 +336,16 @@ class FSMPromptEngineTestCase(TestCase):
         agent.run("Hi")
 
     def test_02_system_message_contains_full_flow(self):
-        accueil = _AccueilState(
-            entry="saluer_en_se_presentant_poliment_et_professionellement_et_ensuite_demander_prenom"
-        )
-        demande_prenom = _DemandePrenomState(entry="demander_prenom")
-        demande_service = _DemandeServiceState(
-            entry="demander_service_avec_options:  Réparations rapides :: Rénovation énergétique :: Travaux électriques :: Salle de bain :: Cuisine"
-        )
-        demande_delai = _DemandeDelaiState(entry="demander_delai_execution")
-        calcul_date = _CalculDateState(
-            entry="appeler_outil_getCurrentDay_et_calculer_date"
-        )
-        demande_budget = _DemandeBudgetState(entry="demander_budget_en_euros")
-        demande_adresse = _DemandeAdresseState(entry="demander_adresse_charleroi")
-        recapitulatif = _RecapitulatifState(
-            entry="afficher_resume_et_demander_confirmation"
-        )
-        correction = _CorrectionState(entry="demander_information_erronee")
-        sauvegarde = _SauvegardeState(
-            entry="sauvegarder_donnees_avec_outil_sauvegarder_et_feliciter"
-        )
-
-        accueil.add_transition(event="message_utilisateur", next_state="DemandePrenom")
-
-        demande_prenom.add_transition(
-            event="reponse_invalide", next_state="DemandePrenom"
-        )
-        demande_prenom.add_transition(
-            event="prenom_valide", next_state="DemandeService"
-        )
-
-        demande_service.add_transition(
-            event="service_invalide", next_state="DemandeService"
-        )
-        demande_service.add_transition(
-            event="service_valide", next_state="DemandeDelai"
-        )
-
-        demande_delai.add_transition(event="delai_invalide", next_state="DemandeDelai")
-        demande_delai.add_transition(event="delai_valide", next_state="CalculDate")
-
-        calcul_date.add_transition(event=None, next_state="DemandeBudget")
-
-        demande_budget.add_transition(
-            event="budget_invalide", next_state="DemandeBudget"
-        )
-        demande_budget.add_transition(
-            event="budget_valide", next_state="DemandeAdresse"
-        )
-
-        demande_adresse.add_transition(
-            event="adresse_invalide", next_state="DemandeAdresse"
-        )
-        demande_adresse.add_transition(
-            event="adresse_valide", next_state="Recapitulatif"
-        )
-
-        recapitulatif.add_transition(event="confirmation_oui", next_state="Sauvegarde")
-        recapitulatif.add_transition(event="confirmation_non", next_state="Correction")
-
-        correction.add_transition(event="correction_prenom", next_state="DemandePrenom")
-        correction.add_transition(
-            event="correction_service", next_state="DemandeService"
-        )
-        correction.add_transition(event="correction_delai", next_state="DemandeDelai")
-        correction.add_transition(event="correction_budget", next_state="DemandeBudget")
-        correction.add_transition(
-            event="correction_adresse", next_state="DemandeAdresse"
-        )
+        accueil = _AccueilState()
+        demande_prenom = _DemandePrenomState()
+        demande_service = _DemandeServiceState()
+        demande_delai = _DemandeDelaiState()
+        calcul_date = _CalculDateState()
+        demande_budget = _DemandeBudgetState()
+        demande_adresse = _DemandeAdresseState()
+        recapitulatif = _RecapitulatifState()
+        correction = _CorrectionState()
+        sauvegarde = _SauvegardeState()
 
         engine = FSMPromptEngine(
             initial_state=accueil,

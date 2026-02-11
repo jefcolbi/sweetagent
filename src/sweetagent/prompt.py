@@ -1,4 +1,5 @@
 import json
+from dataclasses import dataclass
 from typing import Optional, List, Literal, Dict
 from pydantic import BaseModel
 import re
@@ -387,8 +388,57 @@ Final answer after tools call
             )
 
 
+@dataclass
+class Transition:
+    event: Optional[str] = None
+    condition: Optional[str] = None
+    action: Optional[str] = None
+    next_state: Optional[str] = None
+
+
 class BaseState:
+    """To define a State inherit this bases class and
+    define the `name` attribute which is mandatory.
+
+    Then define `default_entry`, `default_do` and `default_exit`
+    if your state requires them.
+
+    Then define class attributes for the events your state support
+    each attribute starting with `event_`
+
+    Then define class attributes for the actions your state support
+    each attribute starting with `action_`
+
+    Then define class attributes for the conditions your state support
+    each attribute starting with `condition_`
+
+    Then define the `default_transitions` using the class attributes
+    on top
+
+    Full example
+
+    ```python
+    class AskAgeState(BaseState):
+
+        name = "AskAge"
+        default_entry = "ask age to user"
+        event_user_message = "user_message"
+        condition_age_valid = "age_valid"
+        condition_age_invalid = "age_invalid"
+        action_log = "log"
+        default_transitions = [
+            Transition(event=event_user_message, condition=condition_age_invalid, next_state=name),
+            Transition(event=event_user_message, condition=condition_age_valid, next_state=AskCityState.name)
+        ]
+    ```
+
+    """
+
     name: str
+    default_entry: Optional[str] = None
+    default_do: Optional[str] = None
+    default_exit: Optional[str] = None
+    default_transitions: Optional[List[Transition]] = None
 
     def __init__(
         self,
@@ -396,11 +446,29 @@ class BaseState:
         do: Optional[str] = None,
         _exit: Optional[str] = None,
     ):
-        self.entry = entry
-        self.do = do
-        self._exit = _exit
+        self.entry = entry or self.default_entry
+        self.do = do or self.default_do
+        self._exit = _exit or self.default_exit
 
-        self.transitions: List[Dict] = []
+        self.transitions: List[Dict] = self._transform_main_transitions()
+
+    def _transform_main_transitions(self):
+        if not self.default_transitions:
+            return []
+
+        res = []
+        for trans in self.default_transitions:
+            dict_trans = {}
+            if trans.event:
+                dict_trans["event"] = trans.event
+            if trans.action:
+                dict_trans["action"] = trans.action
+            if trans.condition:
+                dict_trans["condition"] = trans.condition
+            if trans.next_state:
+                dict_trans["next_state"] = trans.next_state
+            res.append(dict_trans)
+        return res
 
     def add_transition(
         self,
@@ -479,13 +547,6 @@ class BaseState:
         res += ", ".join(parts)
         res += ")"
         return res
-
-
-class FSM:
-    def __init__(
-        self, initial_state: BaseState, end_state: BaseState, states: List[BaseState]
-    ):
-        pass
 
 
 class FSMPromptEngine(BasePromptEngine):
